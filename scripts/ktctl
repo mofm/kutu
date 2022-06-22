@@ -1,0 +1,27 @@
+#! /usr/bin/env python
+
+import argparse
+import sys
+
+from kutu.lib.main import ktctl_main
+
+if __name__ == "__main__":
+    # if not check_system():
+    #     sys.stderr.write(
+    #         "The nspctl command failed to load:"
+    #         "only work on systems that have been booted with systemd."
+    #     )
+    #     sys.exit(1)
+
+    try:
+        ktctl_main()
+    except argparse.ArgumentError as e:
+        sys.stderr.write("{}\n".format(str(e)))
+        sys.exit(1)
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:
+        import traceback
+        t_str = traceback.format_exc()
+        sys.stderr.write(t_str)
+        sys.exit(1)
