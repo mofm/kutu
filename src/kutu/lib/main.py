@@ -20,6 +20,12 @@ no_args = {
     },
 }
 
+one_args = {
+    "kill": {
+        "help": "Kill one or more running containers"
+    }
+}
+
 
 def parser_opts():
     """
@@ -32,6 +38,19 @@ def parser_opts():
         sargs = [myopt]
         sp = subparsers.add_parser(*sargs, **kwargs)
         sp.set_defaults(func=myopt)
+
+    for myopt, kwargs in one_args.items():
+        sargs = [myopt]
+        sp = subparsers.add_parser(*sargs, **kwargs)
+        sp.add_argument("name", nargs="+")
+        sp.set_defaults(func=myopt)
+
+    # run arguments
+    sp = subparsers.add_parser("run", help="Run a command in a new container")
+    sp.add_argument("name")
+    sp.add_argument("image")
+    sp.add_argument("-c", "--cmd")
+    sp.set_defaults(func="run")
 
     # bootstrap arguments
     sp = subparsers.add_parser("bootstrap",
