@@ -24,17 +24,17 @@ from .lib.contrun import ContainerContext
 logger = logging.getLogger(__name__)
 
 
-# def _ensure_exists(wrapped):
-#     """
-#     Decorator to ensure that the named container exists
-#     """
-#     @functools.wraps(wrapped)
-#     def check_exists(name, *args, **kwargs):
-#         if not exists(name):
-#             raise Exception("Container '{}' does not exist".format(name))
-#         return wrapped(name, *args, **clean_kwargs(**kwargs))
-#
-#     return check_exists
+def _ensure_cont_exists(wrapped):
+    """
+    Decorator to ensure that the named container exists
+    """
+    @functools.wraps(wrapped)
+    def check_exists(name, *args, **kwargs):
+        if not cont_exists(name):
+            raise Exception("Container '{}' does not exist".format(name))
+        return wrapped(name, *args, **clean_kwargs(**kwargs))
+
+    return check_exists
 
 
 def _check_useruid(wrapped):
@@ -151,7 +151,8 @@ def _add_img_json(name, imgbase, version):
         "ImageName": name,
         "ImageBase": imgbase,
         "Version": version,
-        "CreatedTime": strftime("%Y-%m-%d %H:%M:%S", localtime())
+        "CreatedTime": strftime("%Y-%m-%d %H:%M:%S", localtime()),
+        "Containers": []
     }
     try:
         with open(os.path.join(_img_root(), "images.json"), "r+") as f:
@@ -379,7 +380,7 @@ def img_remove(name):
             for img in name:
                 if img in img_list():
                     for i in json_data["images"]:
-                        if i["ImageName"] == img:
+                        if i["ImageName"] == img and not i["Containers"]:
                             json_data["images"].remove(i)
                             shutil.rmtree(os.path.join(_img_root(), img))
                 else:
@@ -407,18 +408,6 @@ def cont_listrun():
         pass
 
     return ret
-#
-#
-# alias_list = alias_function(list_running, "list")
-#
-#
-# def list_stopped():
-#     """
-#     Lists stopped kutu containers
-#     """
-#     return sorted(set(list_all()) - set(list_running()))
-#
-#
 
 
 def img_exists(name):
@@ -446,17 +435,10 @@ def run(name, image, cmd):
     """
     Run the named kutu container with entry point command
     """
-    if not img_exists(image) or cont_exists(name):
-        raise Exception("Container failed: Image does not exist or Container name already exists")
+    if create(name, image, cmd):
+        start(name)
     else:
-        _make_container_root(name)
-
-    epoint = shlex.split(cmd)
-    rootdir = _cont_root(name)
-    imgdir = _img_root(image)
-    piddir = _pid(name)
-    constart = ContainerStart(rootdir, imgdir, piddir, epoint)
-    return constart.start()
+        raise Exception("Failed to run container")
 
 
 @_check_useruid
@@ -468,53 +450,114 @@ def kill(name):
         if i in cont_listrun():
             pidfile = _pid(i)
             constop = ContainerStop(pidfile)
-            return constop.stop()
+            constop.stop()
         else:
             logger.warning("Container is not running: {}".format(i))
 
+    return True
 
-#
-#
-# @_ensure_exists
-# def state(name):
-#     """
-#     Return the state of container (running or stopped)
-#     """
-#     if name in list_running():
-#         return "Running"
-#     else:
-#         return "Stopped"
-#
-#
-# @_ensure_exists
-# @_check_useruid
-# def remove(name, stop=False):
-#     """
-#     Remove the named kutu container
-#     """
-#     if not stop and state(name) != "Stopped":
-#         raise Exception("Container is not stopped: {}".format(name))
-#
-#     def _failed_remove(name, exc):
-#         raise Exception("Unable to remove container {}: {}".format(name, exc))
-#
-#     try:
-#         shutil.rmtree(os.path.join(_root(), name))
-#     except OSError as exc:
-#         _failed_remove(name, exc)
-#
-#     return True
-#
-#
-# @_ensure_exists
-# @_check_useruid
-# def shell(name):
-#     """
-#     login the interactive shell in the container
-#     """
-#     if state(name) != "Running":
-#         raise Exception("Container is not running: {}".format(name))
-#
-#     rootdir = _root(name)
-#     with ContainerContext(rootdir) as container:
-#         container.interactive_shell()
+
+@_ensure_cont_exists
+def state(name):
+    """
+    Return the state of container (running or stopped)
+    """
+    if name in cont_listrun():
+        return "Running"
+    else:
+        return "Stopped"
+
+
+@_check_useruid
+def create(name, image, cmd):
+    """
+    Create a new container
+    """
+    if not img_exists(image) or cont_exists(name):
+        raise Exception("Container failed: Image does not exist or Container name already exists")
+    else:
+        dest = _make_container_root(name)
+
+    new_cont = {
+        "ContainerName": name,
+        "ImageName": image,
+        "Entrypoint": cmd,
+        "CreatedTime": strftime("%Y-%m-%d %H:%M:%S", localtime())
+    }
+    try:
+        # first, create container json file
+        with open(os.path.join(dest, name + ".json"), "w") as f:
+            json.dump(new_cont, f, indent=4, separators=(", ", ": "), sort_keys=True)
+
+        # second, update 'Containers' property in image file
+        with open(os.path.join(_img_root(), "images.json"), "r+") as jfile:
+            json_data = json.load(jfile)
+            for i in json_data["images"]:
+                if i["ImageName"] == image:
+                    i["Containers"].append(name)
+            jfile.seek(0)
+            json.dump(json_data, jfile, indent=4, separators=(", ", ": "), sort_keys=True)
+            jfile.truncate()
+    except (OSError, json.JSONDecodeError) as exc:
+        _build_failed(dest, name)
+        raise Exception("Building container failed: {}".format(exc))
+
+    return True
+
+
+@_ensure_cont_exists
+@_check_useruid
+def start(name):
+    """
+    Start the named kutu container
+    """
+    if name == "Running":
+        raise Exception("Container already running: {}".format(name))
+
+    rootdir = _cont_root(name)
+    pidfile = _pid(name)
+
+    try:
+        with open(os.path.join(rootdir, name + ".json"), "r") as f:
+            cont_data = json.load(f)
+
+        epoint = shlex.split(cont_data["Entrypoint"])
+        imgdir = _img_root(cont_data["ImageName"])
+        constart = ContainerStart(rootdir, imgdir, pidfile, epoint)
+        constart.start()
+    except OSError as exc:
+        raise Exception("Unable to start container: {}".format(exc))
+
+    return True
+
+
+@_ensure_cont_exists
+@_check_useruid
+def cont_remove(name, stop=False):
+    """
+    Remove the named kutu container
+    """
+    if not stop and state(name) != "Stopped":
+        raise Exception("Container is not stopped: {}".format(name))
+
+    rootdir = _cont_root(name)
+
+    try:
+        # first, read the image name from container json
+        with open(os.path.join(rootdir, name + ".json"), "r") as f:
+            cont_data = json.load(f)
+            img = cont_data["ImageName"]
+        # second, delete container name from image Containers property
+        with open(os.path.join(_img_root(), "images.json"), "r+") as jfile:
+            json_data = json.load(jfile)
+            for i in json_data["images"]:
+                if i["ImageName"] == img:
+                    i["Containers"].remove(name)
+            jfile.seek(0)
+            json.dump(json_data, jfile, indent=4, separators=(", ", ": "), sort_keys=True)
+            jfile.truncate()
+        shutil.rmtree(rootdir)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise Exception("Unable to remove container {}: {}".format(name, exc))
+
+    return True

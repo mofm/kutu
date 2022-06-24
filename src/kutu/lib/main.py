@@ -52,6 +52,18 @@ def parser_opts():
     sp.add_argument("-c", "--cmd")
     sp.set_defaults(func="run")
 
+    # create arguments
+    sp = subparsers.add_parser("create", help="Create a new container")
+    sp.add_argument("name")
+    sp.add_argument("image")
+    sp.add_argument("-c", "--cmd")
+    sp.set_defaults(func="create")
+
+    # start arguments
+    sp = subparsers.add_parser("start", help="Start stopped container")
+    sp.add_argument("name")
+    sp.set_defaults(func="start")
+
     # bootstrap arguments
     sp = subparsers.add_parser("bootstrap",
                                help="Bootstrap a container from package servers",
@@ -71,6 +83,20 @@ def parser_opts():
     img_rm = img_sub.add_parser("remove", aliases=["rm"], help="Remove Image")
     img_rm.add_argument("name", nargs="+")
     img_rm.set_defaults(func="img_remove")
+
+    # container positional arguments
+    sp = subparsers.add_parser("container", help="Manages Container")
+    cont_sub = sp.add_subparsers()
+    # list containers
+    cont_ls = cont_sub.add_parser("list", aliases=["ls"], help="List Running Container")
+    cont_ls.set_defaults(func="cont_listrun")
+    # list all containers
+    cont_lsa = cont_sub.add_parser("list-all", aliases=["lsa"], help="List All Container")
+    cont_lsa.set_defaults(func="cont_listall")
+    # remove positional args
+    cont_rm = cont_sub.add_parser("remove", aliases=["rm"], help="Remove Image")
+    cont_rm.add_argument("name")
+    cont_rm.set_defaults(func="cont_remove")
 
     vargs = parser.parse_args()
     return vargs
