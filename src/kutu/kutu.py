@@ -18,8 +18,9 @@ from .utils.tar import tar_extract
 from .utils.checksum import checksum_url, parse_checksum, verify_all
 from .utils.cmd import run_cmd
 from .lib.funcutils import alias_function
+from .utils.jsonfile import JsonFile
 from .services.container import ContainerStart, ContainerStop
-from .lib.contrun import ContainerContext
+
 
 logger = logging.getLogger(__name__)
 
@@ -155,12 +156,11 @@ def _add_img_json(name, imgbase, version):
         "Containers": []
     }
     try:
-        with open(os.path.join(_img_root(), "images.json"), "r+") as f:
-            json_data = json.load(f)
+        with JsonFile(os.path.join(_img_root(), "images.json"), "r+") as f:
+            json_data = f.read()
             json_data["images"].append(new_img)
-            f.seek(0)
-            json.dump(json_data, f, indent=4, separators=(", ", ": "), sort_keys=True)
-    except OSError as exc:
+            f.save()
+    except IOError as exc:
         raise Exception("Image {} failed to add to json file: {}".format(name, exc))
 
 
@@ -375,8 +375,8 @@ def img_remove(name):
     Remove the named image(s)
     """
     try:
-        with open(os.path.join(_img_root(), "images.json"), "r+") as f:
-            json_data = json.load(f)
+        with JsonFile(os.path.join(_img_root(), "images.json"), "r+") as f:
+            json_data = f.read()
             for img in name:
                 if img in img_list():
                     for i in json_data["images"]:
@@ -385,10 +385,8 @@ def img_remove(name):
                             shutil.rmtree(os.path.join(_img_root(), img))
                 else:
                     logger.warning("Image '{}' not found".format(img))
-            f.seek(0)
-            json.dump(json_data, f, indent=4, separators=(", ", ": "), sort_keys=True)
-            f.truncate()
-    except (OSError, json.JSONDecodeError) as exc:
+            f.save()
+    except (IOError, json.decoder.JSONDecodeError) as exc:
         raise Exception("Unable to remove image(s): {}".format(exc))
 
     return True
@@ -486,19 +484,17 @@ def create(name, image, cmd):
     }
     try:
         # first, create container json file
-        with open(os.path.join(dest, name + ".json"), "w") as f:
-            json.dump(new_cont, f, indent=4, separators=(", ", ": "), sort_keys=True)
+        with JsonFile(os.path.join(dest, name + ".json"), "w") as f:
+            f.write(new_cont)
 
         # second, update 'Containers' property in image file
-        with open(os.path.join(_img_root(), "images.json"), "r+") as jfile:
-            json_data = json.load(jfile)
+        with JsonFile(os.path.join(_img_root(), "images.json"), "r+") as jfile:
+            json_data = jfile.read()
             for i in json_data["images"]:
                 if i["ImageName"] == image:
                     i["Containers"].append(name)
-            jfile.seek(0)
-            json.dump(json_data, jfile, indent=4, separators=(", ", ": "), sort_keys=True)
-            jfile.truncate()
-    except (OSError, json.JSONDecodeError) as exc:
+            jfile.save()
+    except (IOError, json.decoder.JSONDecodeError) as exc:
         _build_failed(dest, name)
         raise Exception("Building container failed: {}".format(exc))
 
@@ -544,20 +540,18 @@ def cont_remove(name, stop=False):
 
     try:
         # first, read the image name from container json
-        with open(os.path.join(rootdir, name + ".json"), "r") as f:
-            cont_data = json.load(f)
+        with JsonFile(os.path.join(rootdir, name + ".json"), "r") as f:
+            cont_data = f.read()
             img = cont_data["ImageName"]
         # second, delete container name from image Containers property
-        with open(os.path.join(_img_root(), "images.json"), "r+") as jfile:
-            json_data = json.load(jfile)
+        with JsonFile(os.path.join(_img_root(), "images.json"), "r+") as jfile:
+            json_data = jfile.read()
             for i in json_data["images"]:
                 if i["ImageName"] == img:
                     i["Containers"].remove(name)
-            jfile.seek(0)
-            json.dump(json_data, jfile, indent=4, separators=(", ", ": "), sort_keys=True)
-            jfile.truncate()
+            jfile.save()
         shutil.rmtree(rootdir)
-    except (OSError, json.JSONDecodeError) as exc:
+    except (IOError, json.decoder.JSONDecodeError) as exc:
         raise Exception("Unable to remove container {}: {}".format(name, exc))
 
     return True
