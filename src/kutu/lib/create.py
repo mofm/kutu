@@ -88,21 +88,16 @@ class PID1:
             m.destination.mkdir(parents=True, exist_ok=True)
             mount(m.source, m.destination, m.type, m.flags, options)
 
-    def create_tmpfs_dirs(self):
-        if Path('/usr/bin/systemd-tmpfiles').exists():
-            for m in CONTAINER_MOUNTS:
-                if m.type == "tmpfs":
-                    tmpfiles_output = subprocess.check_output(
-                        ['/usr/bin/systemd-tmpfiles', '--create', '--prefix', str(m.destination)],
-                        stderr=subprocess.STDOUT,
-                    )
-                    if tmpfiles_output:
-                        logger.debug("systemd-tmpfiles output: {}".format(tmpfiles_output))
-        else:
-            logger.warning(
-                "Could not run systemd-tmpfiles, because it does not exist. "
-                "/tmp and /run will not be populated."
-            )
+    def inaccessible_mounts(self):
+        for m in INACCESSIBLE_MOUNTS:
+            mount(Path("/dev/null"), m, None, MS_BIND, None)
+            mount(None, m, None, MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REMOUNT, None)
+
+    def readonly_mounts(self):
+        for m in READONLY_MOUNTS:
+            if Path(m).exists():
+                mount(m, m, None, MS_BIND, None)
+                mount(None, m, None, MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REMOUNT, None)
 
     def create_device_node(self, name, major, minor, mode, *, is_block_device=False):
         if is_block_device:
@@ -153,7 +148,8 @@ class PID1:
         self.mount_defaults()
         self.create_default_dev_nodes()
         self.create_loop_devices()
-        self.create_tmpfs_dirs()
+        self.inaccessible_mounts()
+        self.readonly_mounts()
         self.umount_old_root()
         sethostname(HOSTNAME)
 

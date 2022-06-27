@@ -17,12 +17,6 @@ MS_SLAVE = 0x00080000
 MS_SHARED = 0x00100000
 MS_STRICTATIME = 0x01000000
 
-# CLONE_NEWNS = 0x00020000
-# CLONE_NEWCGROUP = 0x02000000
-# CLONE_NEWUTS = 0x04000000
-# CLONE_NEWIPC = 0x08000000
-# CLONE_NEWPID = 0x20000000
-# CLONE_NEWNET = 0x40000000
 CLONE_FS = 0x00000200
 CLONE_FILES = 0x00000400
 CLONE_NEWNS = 0x00020000
@@ -56,7 +50,28 @@ CONTAINER_MOUNTS = [
         destination=Path("/proc"),
         type="proc",
         source="proc",
-        flags=0,
+        flags=MS_NOSUID | MS_NOEXEC | MS_NODEV,
+        options=None,
+    ),
+    Mount(
+        destination=Path("/proc/sys"),
+        type=None,
+        source=Path("/proc/sys"),
+        flags=MS_BIND,
+        options=None,
+    ),
+    Mount(
+        destination=Path("/proc/sys/net"),
+        type=None,
+        source=Path("/proc/sys/net"),
+        flags=MS_BIND,
+        options=None,
+    ),
+    Mount(
+        destination=Path("/proc/sys"),
+        type=None,
+        source=None,
+        flags=MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REMOUNT,
         options=None,
     ),
     Mount(
@@ -66,7 +81,8 @@ CONTAINER_MOUNTS = [
         flags=MS_NOSUID | MS_STRICTATIME,
         options=[
             "mode=755",
-            "size=65536k",
+            "size=4m",
+            "nr_inodes=1m",
         ],
     ),
     Mount(
@@ -88,7 +104,8 @@ CONTAINER_MOUNTS = [
         flags=MS_NOSUID | MS_NOEXEC | MS_NODEV,
         options=[
             "mode=1777",
-            "size=65536k",
+            "size=10%",
+            "nr_inodes=400k",
         ],
     ),
     Mount(
@@ -108,13 +125,43 @@ CONTAINER_MOUNTS = [
     Mount(
         destination=Path("/run"),
         type="tmpfs",
-        source="shm",
-        flags=MS_NOSUID | MS_NOEXEC | MS_NODEV,
+        source="tmpfs",
+        flags=MS_NOSUID | MS_STRICTATIME | MS_NODEV,
         options=[
-            "mode=1777",
-            "size=65536k",
+            "mode=755",
+            "size=20%",
+            "nr_inodes=800k"
         ],
     ),
+    Mount(
+        destination=Path("/tmp"),
+        type="tmpfs",
+        source="tmpfs",
+        flags=MS_NOSUID | MS_STRICTATIME | MS_NODEV,
+        options=[
+            "mode=1777",
+            "size=10%",
+            "nr_inodes=400k",
+        ],
+    ),
+]
+
+INACCESSIBLE_MOUNTS = [
+    "/proc/kallsyms",
+    "/proc/kcore",
+    "/proc/keys",
+    "/proc/sysrq-trigger",
+    "/proc/timer_list"
+]
+
+READONLY_MOUNTS = [
+        "/proc/acpi",
+        "/proc/apm"
+        "/proc/asound",
+        "/proc/bus",
+        "/proc/fs",
+        "/proc/irq",
+        "/proc/scsi"
 ]
 
 CONTAINER_DEVICE_NODES = [
