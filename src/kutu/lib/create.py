@@ -111,12 +111,22 @@ class PID1:
 
     def create_default_dev_nodes(self):
         for d in CONTAINER_DEVICE_NODES:
-            self.create_device_node(d.name, d.major, d.minor, 0o666)
+            if d.name == "console":
+                self.create_device_node(d.name, d.major, d.minor, 0o600)
+            else:
+                self.create_device_node(d.name, d.major, d.minor, 0o666)
 
-    def create_loop_devices(self):
-        self.create_device_node('loop-control', 10, 237, 0o660)
-        for loop in self.loop_devices:
-            self.create_device_node(loop.name, 7, loop.minor, 0o660, is_block_device=True)
+    def create_symlink_devices(self):
+        try:
+            # create ptmx symlink
+            os.symlink("pts/ptmx", "/dev/ptmx")
+            os.symlink("/proc/self/fd", "/dev/fd")
+            os.symlink("/proc/self/fd/0", "/dev/stdin")
+            os.symlink("/proc/self/fd/1", "/dev/stdout")
+            os.symlink("/proc/self/fd/2", "/dev/stderr")
+            os.symlink("/proc/kcore", "/dev/core")
+        except OSError as exc:
+            raise Exception("Failed to create symlink to devices: {}".format(exc))
 
     def umount_old_root(self):
         umount2('/old_root', MNT_DETACH)
@@ -147,7 +157,7 @@ class PID1:
         self.setup_root_mount()
         self.mount_defaults()
         self.create_default_dev_nodes()
-        self.create_loop_devices()
+        self.create_symlink_devices()
         self.inaccessible_mounts()
         self.readonly_mounts()
         self.umount_old_root()
