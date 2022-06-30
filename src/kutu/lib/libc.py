@@ -3,7 +3,6 @@ import ctypes
 import ctypes.util
 from pathlib import Path
 
-from .variables import SYSCALL_NUM_GETPID, SYSCALL_NUM_CLONE
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +59,7 @@ def pivot_root(new_root: Path, old_root: Path):
 
 
 def clone(flags, stack=0):
-    syscall = libc.syscall
-    syscall.restype = ctypes.c_int
-    syscall.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_int)
-    result = syscall(SYSCALL_NUM_CLONE, flags, stack)
+    result = libc.clone(ctypes.c_int(flags), ctypes.c_int(stack))
     if result < 0:
         raise OSError(abs(result), "clone failed")
     return result
@@ -72,10 +68,7 @@ def clone(flags, stack=0):
 def non_caching_getpid():
     # libc caches the return value of getpid, and does not refresh this
     # cache, if we call syscalls (e.g. clone) by hand.
-    syscall = libc.syscall
-    syscall.restype = ctypes.c_int
-    syscall.argtypes = (ctypes.c_int,)
-    result = syscall(SYSCALL_NUM_GETPID)
+    result = libc.getpid()
     if result < 0:
         raise OSError(abs(result), "getpid failed")
     return result

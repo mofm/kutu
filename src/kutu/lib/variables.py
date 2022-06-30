@@ -27,9 +27,6 @@ CLONE_NEWPID = 0x20000000
 CLONE_NEWNET = 0x40000000
 CLONE_NEWCGROUP = 0x02000000
 
-SYSCALL_NUM_CLONE = 56
-SYSCALL_NUM_GETPID = 39
-
 MNT_DETACH = 2
 
 Mount = namedtuple('Mount', ['destination', 'type', 'source', 'flags', 'options'])
