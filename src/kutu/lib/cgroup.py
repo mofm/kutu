@@ -173,7 +173,7 @@ class Cgroup(object):
 
     # MEMORY
     def _format_memory_value(self, unit, limit=None):
-        units = ('bytes', 'kilobytes', 'megabytes', 'gigabytes')
+        units = ['B', 'KiB', 'MiB', 'GiB']
         if unit not in units:
             raise CgroupsException("Unit must be in {}".format(units))
         if limit is None:
@@ -184,14 +184,7 @@ class Cgroup(object):
             except ValueError:
                 raise CgroupsException('Limit must be convertible to an int')
             else:
-                if unit == 'bytes':
-                    value = limit
-                elif unit == 'kilobytes':
-                    value = limit * 1024
-                elif unit == 'megabytes':
-                    value = limit * 1024 * 1024
-                elif unit == 'gigabytes':
-                    value = limit * 1024 * 1024 * 1024
+                value = limit * 2**(units.index(unit)*10)
         return value
 
     def set_memory_limit(self, limit=None, unit='megabytes'):
