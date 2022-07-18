@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 BASE_CGROUPS = "/sys/fs/cgroup/"
-# we support only cpu ve memory cgroup for now
+# supported only cpu and memory cgroup for now
 HIERARCHIES = [
     'cpu',
     'memory',
@@ -52,7 +52,9 @@ def create_kutu_cgroups(group='kutu'):
 
 
 class Cgroup(object):
-
+    """
+    Common Cgroup implementation
+    """
     def __init__(self, name, hierarchies='all', group='kutu'):
         self.name = name
         # Get Group
@@ -173,7 +175,7 @@ class Cgroup(object):
 
     # MEMORY
     def _format_memory_value(self, unit, limit=None):
-        units = ['B', 'KiB', 'MiB', 'GiB']
+        units = ['B', 'KB', 'MB', 'GB']
         if unit not in units:
             raise CgroupsException("Unit must be in {}".format(units))
         if limit is None:
@@ -187,7 +189,7 @@ class Cgroup(object):
                 value = limit * 2**(units.index(unit)*10)
         return value
 
-    def set_memory_limit(self, limit=None, unit='megabytes'):
+    def set_memory_limit(self, limit=None, unit='MB'):
         if 'memory' in self.cgroups:
             value = self._format_memory_value(unit, limit)
             memory_limit_file = self._get_cgroup_file(

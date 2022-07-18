@@ -192,11 +192,6 @@ CONTAINER_DEVICE_NODES = [
         major=1,
         minor=9,
     ),
-    DeviceNode(
-        name="console",
-        major=136,
-        minor=0,
-    ),
 ]
 
 HOST_NETWORK_BIND_MOUNTS = [

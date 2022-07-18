@@ -120,6 +120,7 @@ class PID1:
         try:
             # create ptmx symlink
             os.symlink("pts/ptmx", "/dev/ptmx")
+            os.symlink("pts/0", "/dev/console")
             os.symlink("/proc/self/fd", "/dev/fd")
             os.symlink("/proc/self/fd/0", "/dev/stdin")
             os.symlink("/proc/self/fd/1", "/dev/stdout")
